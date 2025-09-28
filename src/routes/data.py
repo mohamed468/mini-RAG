@@ -1,13 +1,18 @@
-from fastapi import FastAPI, APIRouter, Depends, UploadFile, File, status
+from fastapi import FastAPI, APIRouter, Depends, UploadFile, File, status, Request
 from fastapi.responses import JSONResponse
 import os
 from helpers.config import get_settings,Settings
-from controllers import DataController, ProjectController
+from controllers import DataController, ProjectController , ProcessController
 import aiofiles
 from models import ResponseSignal
 import logging
+from .schemes.data import ProcessRequest
+from models.ProjectModel import ProjectModel
+from models.ChunkModel import ChunkModel
+from models.db_schemes import DataChunk
 
-logger= logging.getLogger('uvicorn.error')
+
+logger= logging.getLogger('uvicorn.error')   #  في شكل ملف اقدر افحصه واعرف المشكلة فينerrors هيجيب ال 
 data_router=APIRouter(
     prefix="/api/v1/data",
     tags=["api_v1", "data"],
@@ -15,13 +20,19 @@ data_router=APIRouter(
 
 @data_router.post("/upload/{project_id}")
 
-async def upload_data(project_id: str, 
+async def upload_data(request: Request ,project_id: str, 
                       file: UploadFile,                              # = File(...),
                       app_settings : Settings= Depends(get_settings)
                         ):
-
-
     
+    project_model = ProjectModel(
+        db_client= request.app.db_client #pro_id عشان اقدر استدعيه واديله ال project model كده حصلت على ال 
+    )
+
+    project = await project_model.get_project_or_create_one(
+        project_id= project_id               # project idال جواه وخليتها تاخد ال funكده استعديته وناديت ال 
+    )
+
   # Validate the file properites
     data_controller=DataController()
     is_valid, result_Signal = data_controller.validate_uploaded_file(file= file)
@@ -35,7 +46,7 @@ async def upload_data(project_id: str,
         )
     
     project_dir_path= ProjectController().get_project_path(project_id=project_id)
-    file_path= data_controller.generate_unique_filename(
+    file_path, file_id= data_controller.generate_unique_filepath(
         orig_file_name= file.filename,
         project_id= project_id
     )
@@ -49,18 +60,92 @@ async def upload_data(project_id: str,
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content= {
-                "signal" : ResponseSignal.FILE_UPLOAD_FAILEd.value
+                "signal" : ResponseSignal.FILE_UPLOAD_FAILEd.value,
+                
             }
         )
-
-
     return JSONResponse(
         content= {
-            "signal" : ResponseSignal.FILE_UPLOAD_SUCCESS.value
+            "signal" : ResponseSignal.FILE_UPLOAD_SUCCESS.value,
+            "file_id" : file_id,
+            # "project_id" : str(project._id)  # عشان البايثون يقدر يفهمهstr حولته الي 
+            #مش محتاج أظهر دي للمستخدم فهخفيها, والأحسن تمشي بمبدأ 
+            #Don't expose yourself
+
         }
     )            
 
+@data_router.post("/process/{project_id}")
+async def process_endpoint(request: Request ,project_id: str, process_request: ProcessRequest):
 
+    file_id = process_request.file_id
+    chunk_size = process_request.chunk_size
+    overlap_size = process_request.overlap_size
+    do_reset = process_request.do_reset
 
+    #get pro or create ب project واجيب ال projrctmodelمن الداتابيزمن خلال تعريف project_idمحتاج اجيب ال 
 
+    project_model = ProjectModel(
+        db_client= request.app.db_client
+    )
+
+    project = await project_model.get_project_or_create_one(
+        project_id=project_id
+    )
+
+    process_controller = ProcessController(project_id=project_id)
+
+    file_content = process_controller.get_file_content(file_id=file_id)
     
+    file_chunks =process_controller.process_file_content(
+        file_content= file_content,
+        file_id=file_id,
+        chunk_size=chunk_size,
+        overlap_size=overlap_size
+    ) 
+
+    if file_chunks is None or len(file_chunks) ==0:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "signal" : ResponseSignal.PROCESSING_FAILED.value
+            }
+        )
+    
+    #Datachunk بتاع object الى filechunk هنا عايز احول 
+    # return file_chunks
+
+    file_chunks_records= [
+
+        #وأحط القيم بتاعتهاDatachunkهنا هجيب محتويات ال 
+        DataChunk(
+            chunk_text=chunk.page_content,
+            chunk_metadata= chunk.metadata, 
+            chunk_order=i+1,
+            chunk_project_id=project.id,
+        )
+        # recordsكده بقى معايا ال 
+        #بتاعهorderهترجعه هترجع ال elementولكن مع كل file chunksدي هترجع enumerateهنا 
+        for i, chunk in enumerate ( file_chunks)
+    ]
+    # projrctmodelزي ما عرفنا ال chunkmodelهعرف ال 
+
+    chunk_model= ChunkModel(
+        db_client= request.app.db_client
+    )
+
+
+    if do_reset == 1 :
+    #await بيعبر ان في هنا متغير ولكن أنا معنديش أهتمام بعرض أنا بس كتبته كده عشان ال  under score هنا ال 
+        _ =  await chunk_model.delete_chunks_by_project_id(
+            project_id=project.id 
+        )
+
+    no_records = await chunk_model.insert_many_chunks(chunks = file_chunks_records)
+
+    return JSONResponse(
+        content={
+        "signal" : ResponseSignal.PROCESSING_SUCCESS.value,
+        "inserted_chunks" : no_records
+        }
+    )

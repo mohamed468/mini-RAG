@@ -1,0 +1,23 @@
+services:
+  mongodb:
+    image: mongo:7.0-jammy
+    container_name: mongodb
+
+    ports:
+      - "27017:27017"
+
+    volumes:
+      - "/home/mohamed/mongo-data:/data/db"
+      
+    command: ["--bind_ip_all"]  
+
+    networks:
+      -  backend
+    
+    restart: always
+
+
+networks:
+  backend:
+
+
