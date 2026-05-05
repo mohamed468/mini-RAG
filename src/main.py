@@ -22,3 +22,6 @@ async def shutdown_db_client():
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 
+@app.get("/", include_in_schema=False)
+def root():
+    return {"message":"API is running"}

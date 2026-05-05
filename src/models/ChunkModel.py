@@ -3,15 +3,35 @@ from .db_schemes import DataChunk
 from .enums.DataBaseEnums import DataBaseEnum
 from bson.objectid import ObjectId
 from pymongo import InsertOne        #batch/bulk write هحتاج دا في عملية ال  
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 class ChunkModel(BaseDataModel):
-    def __init__(self, db_client: object):
+
+    def __init__(self, db_client: AsyncIOMotorDatabase):
         super().__init__(db_client= db_client)
         self.collection = self.db_client[DataBaseEnum.COLLECTION_CHUNK_NAME.value]
 
+    @classmethod
+    async def create_instance(cls, db_client: AsyncIOMotorDatabase):
+        instance = cls(db_client)
+        await instance.init_collection()
+        return instance
+
+    async def init_collection(self):
+        all_collections = await self.db_client.list_collection_names()
+        if DataBaseEnum.COLLECTION_CHUNK_NAME.value not in all_collections:
+            self.collection = self.db_client[DataBaseEnum.COLLECTION_CHUNK_NAME.value]
+            indexes = DataChunk.get_indexes()
+            for index in indexes:
+                await self.collection.create_index(
+                    index["key"],
+                    name=index["name"],
+                    unique = index["unique"]
+                )
+
     async def create_chunk(self, chunk : DataChunk):
             result = await self.collection.insert_one(chunk.dict(by_alias = True, exclude_unset= True))
-            chunk._id = result.inserted_id
+            chunk.id = result.inserted_id
             return chunk
     
     #str واول ما يخرج يتحول ل objectidهيتحول ل mongo اول ما يدخل id هناال 
@@ -47,7 +67,7 @@ class ChunkModel(BaseDataModel):
               "chunk_project_id" : project_id
          })
 
-         return result.deletet_count
+         return result.deleted_count
          
 
     
