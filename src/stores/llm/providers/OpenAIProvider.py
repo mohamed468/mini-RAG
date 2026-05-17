@@ -19,7 +19,7 @@ class OpenAIProvider(LLMInterface):
 
         self.client = OpenAI(
             api_key = self.api_key,
-            api_url = self.api_url
+            base_url = self.api_url
         )
         self.logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class OpenAIProvider(LLMInterface):
     def process_text(self, text: str):
         return text[:self.default_input_max_characters].strip()
     
-    def generate_text(self, prompt: str, chat_histoey: list = [], max_output_tokens: int = None, temperature: float = None):
+    def generate_text(self, prompt: str, chat_history: list | None = None, max_output_tokens: int |None = None, temperature: float |None  = None):
         if not self.client:
             self.logger.error("OpenAI client was not set")
             return None
@@ -42,22 +42,25 @@ class OpenAIProvider(LLMInterface):
 
         max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_max_output_tokens
         temperature = temperature if temperature else self.default_generation_temperature
+        
+        if chat_history is None:
+            chat_history = []
 
-        chat_histoey.append(
+        chat_history.append(
             self.construct_prompt(prompt= prompt, role= OpenAIEnums.USER.value)
         )
         response = self.client.chat.completions.create(
             model = self.generation_model_id,
-            messages= chat_histoey,
+            messages= chat_history,
             max_tokens= max_output_tokens,
             temperature= temperature
         )
         if not response or not response.choices or len(response.choices) == 0 or not response.choices[0].message:
             self.logger.error("Error while generating text with OpenAI")
             return None
-        return response.choices[0].message["content"]
+        return response.choices[0].message.content
 
-    def embed_text(self, text: str, document_type: str=None):
+    def embed_text(self, text: str, document_type: str|None =None):
         if not self.client:
             self.logger.error("OpenAI client was not set")
             return None

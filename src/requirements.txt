@@ -10,3 +10,5 @@ motor==3.7.1
 langchain-community
 pymongo
 openai==1.35.13
+cohere ==6.1.0
+google-genai
