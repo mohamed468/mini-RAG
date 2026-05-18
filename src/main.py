@@ -6,21 +6,24 @@ from routes import base, data
 from stores.llm.LLMProviderFactory import LLMProviderFactory
 from stores.llm.LLMInterface import LLMInterface #   استدعينا الانترفيس بتاعنا
 from typing import Any
+from stores.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
+from stores.vectordb.VectorDBInterface import VectorDBInterface
 
 # =================================================================
-#   الحل الاحترافي: كلاس مخصص يورث FastAPI ونعرف فيه متغيراتنا
+#   كلاس مخصص يورث FastAPI ونعرف فيه متغيراتنا
 # =================================================================
 class MiniRAGApp(FastAPI):
     mongo_conn: AsyncIOMotorClient
     db_client: Any 
-    generation_client: LLMInterface #  هنا الجمال كله! Pylance هيعرف إن ده بيعمل Generate
+    generation_client: LLMInterface # Pylance هيعرف إن ده بيعمل Generate
     embedding_client: LLMInterface  #  وهنا بيعمل Embed
+    vectordb_client: VectorDBInterface
 
 
 @asynccontextmanager
 async def lifespan(app: MiniRAGApp): #  غيرنا النوع هنا للكلاس بتاعنا
     try:
-        print(" Starting up application...")
+        print(" Starting up application.")
         settings = get_settings()
         
         # MongoDB Connection
@@ -31,6 +34,8 @@ async def lifespan(app: MiniRAGApp): #  غيرنا النوع هنا للكلا�
         # LLM Provider Factory
         llm_provider_factory = LLMProviderFactory(settings)
         
+        vectordb_provider_factory = VectorDBProviderFactory(settings)
+
         # Generation Client
         app.generation_client = llm_provider_factory.create(provider=settings.GENERATION_BACKEND or "") 
         app.generation_client.set_generation_model(model_id=settings.GENERATION_MODEL_ID or "")
@@ -44,6 +49,14 @@ async def lifespan(app: MiniRAGApp): #  غيرنا النوع هنا للكلا�
         )
         print(f" Embedding client initialized ({settings.EMBEDDING_BACKEND})")
         
+        # Vector db client
+
+        app.vectordb_client = vectordb_provider_factory.create(
+            provider = settings.VECTOR_DB_BACKEND or "" # type: ignore
+        )
+        app.vectordb_client.connect()
+        print(f"VectorDB client initialized ({settings.VECTOR_DB_BACKEND})")
+
         yield  
         
     except Exception as e:
@@ -57,6 +70,13 @@ async def lifespan(app: MiniRAGApp): #  غيرنا النوع هنا للكلا�
             print(" MongoDB connection closed")
         except Exception as e:
             print(f" Shutdown error: {e}")
+        try:
+            if hasattr(app, 'vectordb_client'):
+
+                app.vectordb_client.disconnect()
+                print("VectorDB connection closed")
+        except Exception as e:
+            print(f"VectorDB Shutdown error: {e}")
 
 
 # استخدام الكلاس المخصص بتاعنا بدل FastAPI العادي
