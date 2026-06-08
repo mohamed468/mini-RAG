@@ -12,7 +12,7 @@ class BaseController:
             "assets/files"
         )
 
-        self.database_dir os.path.join(
+        self.database_dir = os.path.join(
             self.base_dir,
             "assets/database"
         )

@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
-from routes import base, data
+from routes import base, data, nlp
 from stores.llm.LLMProviderFactory import LLMProviderFactory
 from stores.llm.LLMInterface import LLMInterface #   استدعينا الانترفيس بتاعنا
 from typing import Any
@@ -85,6 +85,7 @@ app = MiniRAGApp(lifespan=lifespan)
 
 app.include_router(base.base_router)
 app.include_router(data.data_router)
+app.include_router(nlp.nlp_router)
 
 @app.get("/", include_in_schema=False)
 def root():

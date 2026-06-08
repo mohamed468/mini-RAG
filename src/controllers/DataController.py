@@ -16,7 +16,7 @@ class DataController(BaseController):
         if file.content_type not in self.app_settings.FILE_ALLOWED_TYPES:     #valdiate the file type
             return False , ResponseSignal.File_type_not_supported.value
         
-        if file.size > self.app_settings.FILE_MAX_SIZE*self.size_scale:
+        if (file.size or 0) > (self.app_settings.FILE_MAX_SIZE or 0) * self.size_scale:
             return False, ResponseSignal.File_size_Exceeded.value    #size is (Byte) but max-size is(mega byte)
         
         return True,ResponseSignal.FILE_VALIDATED_SCCESS.value
