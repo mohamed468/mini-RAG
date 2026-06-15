@@ -21,6 +21,7 @@ class GeminiEnums(Enum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "model"
+     
 class DocumnetTypeEnum(Enum):
     DOCUMENT = "document"
     QUERY = "query"

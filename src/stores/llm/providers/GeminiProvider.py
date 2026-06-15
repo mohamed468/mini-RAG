@@ -16,8 +16,9 @@ class GeminiProvider(LLMInterface):
         self.embedding_model_id = None
         self.embedding_size = None
 
-        # تهيئة الكلاينت باستخدام الإصدار الأحدث من جوجل
         self.client = genai.Client(api_key=self.api_key)
+        
+        self.enums = GeminiEnums
         self.logger = logging.getLogger(__name__)
 
     def set_generation_model(self, model_id: str):

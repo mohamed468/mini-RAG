@@ -3,7 +3,7 @@ from typing import Optional
 from bson import ObjectId
 
 class DataChunk(BaseModel):
-    model_config = ConfigDict(          # ← الأفضل يكون الأول
+    model_config = ConfigDict(# ← الأفضل يكون الأول
         arbitrary_types_allowed=True,
         populate_by_name=True
         )                 #that for pydantic v2
@@ -30,3 +30,8 @@ class DataChunk(BaseModel):
                 "unique" : False
             }
         ]
+
+class RetrivedDocument(BaseModel):
+    text: str
+    score: float
+    

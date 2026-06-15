@@ -8,6 +8,7 @@ from stores.llm.LLMInterface import LLMInterface #   استدعينا الانت
 from typing import Any
 from stores.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from stores.vectordb.VectorDBInterface import VectorDBInterface
+from stores.llm.templates.template_parser import TemplateParser
 
 # =================================================================
 #   كلاس مخصص يورث FastAPI ونعرف فيه متغيراتنا
@@ -56,6 +57,11 @@ async def lifespan(app: MiniRAGApp): #  غيرنا النوع هنا للكلا�
         )
         app.vectordb_client.connect()
         print(f"VectorDB client initialized ({settings.VECTOR_DB_BACKEND})")
+        
+        app.state.template_parser= TemplateParser(
+            language=settings.PRIMARY_LANG,
+            default_language= settings.DEFAULT_LANG,
+        )
 
         yield  
         

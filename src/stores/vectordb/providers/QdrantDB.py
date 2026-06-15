@@ -6,6 +6,7 @@ import logging
 from ..VectorDBEnums import DistanceMethodEnums
 from typing import List
 from qdrant_client.http import models
+from models.db_schemes import RetrivedDocument
 
 class QdrantDB(VectorDBInterface):
     def __init__(self, db_path:str, distance_method: str):
@@ -119,11 +120,25 @@ class QdrantDB(VectorDBInterface):
 
     def search_by_vector(self, collection_name: str, vector: List, limit: int = 5):
         response = self.client.query_points( # type: ignore
-        collection_name=collection_name,
-        query=vector, 
-        limit=limit,
-        with_payload=True
-    )
-    
-        return response.points            
+            collection_name=collection_name,
+            query=vector, 
+            limit=limit,
+            with_payload=True
+        )
+        
+        # 1. نستخرج قائمة النتائج (List) من الكائن اللي راجع
+        results = response.points 
+        
+        if not results or len(results) == 0:
+            return None
+        
+        return [
+            RetrivedDocument(**{
+                "score": result.score,
+                # 2. حماية إضافية: نتأكد إن الـ payload مش None قبل ما نقرأ منه النص
+                "text" : result.payload["text"] if result.payload else "", 
+            })
+            for result in results
+        ]
+                    
     
