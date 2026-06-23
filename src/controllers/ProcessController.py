@@ -9,21 +9,20 @@ from models import ProcessingEnums
 class ProcessController (BaseController):
     def __init__(self, project_id: str):
         super().__init__()
-
         self.project_id = project_id
         self.project_path = ProjectController().get_project_path(project_id)
 
     def get_file_extension(self, file_id :str):
-        return os.path.splitext(file_id)[-1].lower().lstrip(".")
+        return os.path.splitext(file_id)[-1].lower()
 
 
     def get_file_loader(self, file_id: str):
         file_ext = self.get_file_extension(file_id=file_id)
         file_path = os.path.join(
-            self.project_path,
-            file_id        
-        )
+            self.project_path, file_id)
 
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
 
         if file_ext == ProcessingEnums.TXT.value:
             return TextLoader(file_path, encoding="utf-8")
@@ -34,12 +33,24 @@ class ProcessController (BaseController):
         raise ValueError(f"Unsupported file type '.{file_ext}' for file '{file_id}'")
 
     def get_file_content(self, file_id:str):
-        loader = self.get_file_loader(file_id=file_id)
-
-        return loader.load()
+        try:
+            loader = self.get_file_loader(file_id=file_id)
+            documents = loader.load()
+            
+            # لو الـ loader رجع قائمة فاضية (معناها الملف فاضي)
+            if not documents:
+                print("DEBUG: Loader returned empty list (Empty File?)")
+                return None
+                
+            return documents
+        except Exception as e:
+            print(f"DEBUG: Error inside get_file_content: {e}")
+            return None
 
     def process_file_content(self, file_id: str,
                      file_content:list, chunk_size=100, overlap_size= 20 ):
+        if not file_content:
+            return None
 
         text_spliter= RecursiveCharacterTextSplitter(
             chunk_size= chunk_size,

@@ -1,0 +1,134 @@
+from ..LLMInterface import LLMInterface
+from ..LLMEnums import DocumnetTypeEnum
+from ..LLMEnums import GeminiEnums 
+from google import genai
+from google.genai import types
+import logging
+
+class GeminiProvider(LLMInterface):
+    def __init__(self, api_key: str, default_input_max_characters: int=1000, default_generation_max_output_tokens: int=1000, default_generation_temperature: float=0.1):
+        
+        self.api_key = api_key
+        self.default_input_max_characters = default_input_max_characters
+        self.default_generation_max_output_tokens = default_generation_max_output_tokens
+        self.default_generation_temperature = default_generation_temperature
+        self.generation_model_id = None
+        self.embedding_model_id = None
+        self.embedding_size = None
+
+        self.client = genai.Client(api_key=self.api_key)
+        
+        self.enums = GeminiEnums
+        self.logger = logging.getLogger(__name__)
+
+    def set_generation_model(self, model_id: str):
+        self.generation_model_id = model_id
+
+    def set_embedding_model(self, model_id: str, embedding_size: int):
+        self.embedding_model_id = model_id
+        self.embedding_size = embedding_size
+
+    def process_text(self, text: str):
+        return text[:self.default_input_max_characters].strip()
+
+    def generate_text(self, prompt: str, chat_history: list | None = None, max_output_tokens: int | None = None, temperature: float | None = None):
+        if not self.client:
+            self.logger.error("Gemini client was not set")
+            return None
+        if not self.generation_model_id:
+            self.logger.error("Generation model for Gemini was not set")
+            return None
+
+        if chat_history is None:
+            chat_history = []
+
+        max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_max_output_tokens
+        temperature = temperature if temperature else self.default_generation_temperature
+
+        # إضافة الرسالة الجديدة للهيستوري
+        chat_history.append(
+            self.construct_prompt(prompt=prompt, role= GeminiEnums.USER.value)
+        )
+
+        # تجهيز الإعدادات (Config) الخاصة بـ Gemini
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+        )
+
+        try:
+            # استخدام contents بدلاً من messages بناءً على الدوكمنتيشن
+            response = self.client.models.generate_content(
+                model=self.generation_model_id,
+                contents=chat_history,
+                config=config
+            )
+            
+            if not response or not response.text:
+                self.logger.error("Error while generating text with Gemini")
+                return None
+                
+            return response.text
+            
+        except Exception as e:
+            self.logger.error(f"Gemini API Error: {str(e)}")
+            return None
+
+    def embed_text(self, text: str, document_type: str | None = None):
+        if not self.client:
+            self.logger.error("Gemini client was not set")
+            return None
+
+        if not self.embedding_model_id:
+            self.logger.error("Embedding model for Gemini was not set")
+            return None
+
+        processed_text = self.process_text(text)
+        
+        # إعداد حجم الـ Vector إذا كان محدداً
+        config_kwargs = {}
+        if self.embedding_size:
+            config_kwargs["output_dimensionality"] = self.embedding_size
+
+        # معالجة الاختلاف الجذري بين موديل 2 وموديل 1 في جوجل
+        if "gemini-embedding-2" in self.embedding_model_id:
+            # الموديل الجديد يطلب دمج المهمة في النص نفسه
+            if document_type == DocumnetTypeEnum.QUERY.value:
+                processed_text = f"task: search result | query: {processed_text}"
+            else:
+                processed_text = f"title: none | text: {processed_text}"
+                
+            config = types.EmbedContentConfig(**config_kwargs) if config_kwargs else None
+        else:
+            # الموديل القديم (gemini-embedding-001) يعتمد على task_type
+            task_type = "RETRIEVAL_DOCUMENT"
+            if document_type == DocumnetTypeEnum.QUERY.value:
+                task_type = "RETRIEVAL_QUERY"
+            
+            config_kwargs["task_type"] = task_type
+            config = types.EmbedContentConfig(**config_kwargs)
+
+        try:
+            result = self.client.models.embed_content(
+                model=self.embedding_model_id,
+                contents=processed_text,
+                config=config
+            )
+            
+            if not result or not result.embeddings:
+                self.logger.error("Error while embedding text with Gemini")
+                return None
+                
+            # جلب القيم كقائمة أرقام
+            return result.embeddings[0].values
+            
+        except Exception as e:
+            self.logger.error(f"Gemini Embedding Error: {str(e)}")
+            return None
+
+    def construct_prompt(self, prompt: str, role: str):
+        # هيكل الرسائل المعتمد في جوجل (role و parts)
+        return {
+            "role": role,
+            "parts": [{"text": self.process_text(prompt)}]
+        }

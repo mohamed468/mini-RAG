@@ -7,7 +7,13 @@ services:
       - "27017:27017"
 
     volumes:
-      - "/home/mohamed/mongo-data:/data/db"
+      - mongodata:/data/db
+      # - "/home/mohamed/mongo-data:/data/db"
+
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}  #.envكده يقدرياخدالقيم بتاعتهم من 
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+
       
     command: ["--bind_ip_all"]  
 
@@ -19,5 +25,10 @@ services:
 
 networks:
   backend:
+
+volumes:
+  mongodata:
+  
+
 
 

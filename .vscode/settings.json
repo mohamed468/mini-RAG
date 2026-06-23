@@ -3,5 +3,11 @@
         "file:///c%3A/Users/mohme/.vscode/extensions/alirezakay.rtltextdocuments-0.1.4/assets/cascadia.css",
         "file:///c%3A/Users/mohme/.vscode/extensions/alirezakay.rtltextdocuments-0.1.4/assets/rtl.css",
         "file:///c%3A/Users/mohme/.vscode/extensions/alirezakay.rtltextdocuments-0.1.4/assets/rtl.js"
-    ]
+    ],
+    "python.analysis.extraPaths": [
+        "./src"
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python.languageServer": "Pylance"
 }
