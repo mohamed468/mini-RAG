@@ -19,7 +19,7 @@ class MiniRAGApp(FastAPI):
     generation_client: LLMInterface # Pylance هيعرف إن ده بيعمل Generate
     embedding_client: LLMInterface  #  وهنا بيعمل Embed
     vectordb_client: VectorDBInterface
-
+    template_parser: TemplateParser
 
 @asynccontextmanager
 async def lifespan(app: MiniRAGApp): #  غيرنا النوع هنا للكلاس بتاعنا
@@ -58,7 +58,7 @@ async def lifespan(app: MiniRAGApp): #  غيرنا النوع هنا للكلا�
         app.vectordb_client.connect()
         print(f"VectorDB client initialized ({settings.VECTOR_DB_BACKEND})")
         
-        app.state.template_parser= TemplateParser(
+        app.template_parser= TemplateParser(
             language=settings.PRIMARY_LANG,
             default_language= settings.DEFAULT_LANG,
         )
